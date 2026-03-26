@@ -5,7 +5,11 @@ import re
 from collections import defaultdict
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -14,6 +18,12 @@ import chromadb
 
 # ─── App Setup ────────────────────────────────────────────────────
 app = FastAPI(title="FRAGAI API", version="1.0.0")
+
+# ─── Rate Limiter ─────────────────────────────────────────────────
+# 10 searches per day per IP address
+limiter = Limiter(key_func=get_remote_address, default_limits=["10/day"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -274,7 +284,8 @@ def stats():
     }
 
 @app.post("/search", response_model=SearchResponse)
-async def search(req: SearchRequest):
+@limiter.limit("10/day")
+async def search(request: Request, req: SearchRequest):
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
