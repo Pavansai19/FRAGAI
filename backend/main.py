@@ -3,6 +3,7 @@ import math
 import json
 import re
 from datetime import date, datetime
+from datetime import date, datetime
 from collections import defaultdict
 from typing import Optional
 
@@ -44,6 +45,25 @@ async def preflight_handler(rest_of_path: str):
             "Access-Control-Allow-Headers": "*",
         }
     )
+
+# ─── Visit Tracking ──────────────────────────────────────────────
+VISIT_LOG = []
+SEARCH_COUNT = {"total": 0, "today": 0, "date": str(date.today())}
+
+def record_visit(ip: str, query: str = ""):
+    today = str(date.today())
+    if SEARCH_COUNT["date"] != today:
+        SEARCH_COUNT["date"] = today
+        SEARCH_COUNT["today"] = 0
+    SEARCH_COUNT["total"] += 1
+    SEARCH_COUNT["today"] += 1
+    VISIT_LOG.append({
+        "ts": datetime.utcnow().isoformat(),
+        "ip": ip[:8] + "***",
+        "query": query[:60],
+    })
+    if len(VISIT_LOG) > 500:
+        VISIT_LOG.pop(0)
 
 # ─── Visit Tracking ──────────────────────────────────────────────
 VISIT_LOG = []
@@ -326,6 +346,8 @@ async def search(request: Request, req: SearchRequest):
 
     record_visit(request.client.host, req.query)
 
+    record_visit(request.client.host, req.query)
+
     # ── 2. BM25 retrieval ────────────────────────────────────────
     bm25_hits = BM25_INDEX.search(req.query, candidates, top_k=req.top_k * 2, alpha=req.alpha)
     retrieval_mode = "bm25"
@@ -389,6 +411,25 @@ async def search(request: Request, req: SearchRequest):
         total_candidates=len(candidates),
         query_tokens=tokenize(req.query),
     )
+
+@app.get("/visits")
+def visits():
+    today = str(date.today())
+    unique_today = len({v["ip"] for v in VISIT_LOG if v["ts"].startswith(today)})
+    unique_total = len({v["ip"] for v in VISIT_LOG})
+    top_queries = {}
+    for v in VISIT_LOG:
+        if v["query"]:
+            top_queries[v["query"]] = top_queries.get(v["query"], 0) + 1
+    top_sorted = sorted(top_queries.items(), key=lambda x: x[1], reverse=True)[:10]
+    return {
+        "total_searches":        SEARCH_COUNT["total"],
+        "searches_today":        SEARCH_COUNT["today"],
+        "unique_visitors_today": unique_today,
+        "unique_visitors_total": unique_total,
+        "top_queries":           top_sorted,
+        "recent":                VISIT_LOG[-10:][::-1],
+    }
 
 @app.get("/visits")
 def visits():
