@@ -1,62 +1,63 @@
 import { useState, useEffect } from "react";
 
-// ─── API base URL ─────────────────────────────────────────────────
-// In prod: VITE_API_URL is set to the Railway backend URL
-// In dev:  Vite proxy forwards /api → http://backend:8000
 const API = import.meta.env.VITE_API_URL
   ? import.meta.env.VITE_API_URL.replace(/\/$/, "")
   : "/api";
 
-// ─── Constants ────────────────────────────────────────────────────
+// ─── Color Map ────────────────────────────────────────────────────
 const CAT_COLORS = {
-  niche:            "#a78bfa",
-  designer:         "#60a5fa",
-  budget:           "#34d399",
-  "middle eastern": "#d4a96a",
-};
-
-const SOURCE_COLORS = {
-  classic: "#9ca3af",
-  modern:  "#f472b6",
+  niche:            { bg: "#1a0a2e", text: "#c084fc" },
+  designer:         { bg: "#0a1628", text: "#60a5fa" },
+  budget:           { bg: "#0a2018", text: "#34d399" },
+  "middle eastern": { bg: "#1e1208", text: "#f59e0b" },
 };
 
 const SAMPLE_QUERIES = [
-  "romantic winter dinner date evening",
-  "fresh summer beach day casual",
-  "powerful masculine office cold weather",
-  "soft feminine floral spring daytime",
-  "affordable budget versatile everyday",
-  "recent 2024 niche exclusive night out",
-  "arabic oud oriental winter evening",
-  "light clean unisex work commute",
+  "romantic winter dinner date",
+  "fresh summer beach casual",
+  "powerful masculine office",
+  "soft feminine spring daytime",
+  "affordable everyday versatile",
+  "recent niche exclusive night out",
+  "arabic oud oriental winter",
+  "light clean unisex commute",
 ];
 
-// ─── Main Component ───────────────────────────────────────────────
+// ─── Gender Label ─────────────────────────────────────────────────
+function genderLabel(fi, mi) {
+  if (fi > 0.7) return { label: "Feminine", color: "#f9a8d4" };
+  if (mi > 0.7) return { label: "Masculine", color: "#93c5fd" };
+  return { label: "Unisex", color: "#a3a3a3" };
+}
+
+// ─── Value Label ──────────────────────────────────────────────────
+const VALUE_LABELS = {
+  "great value": { label: "Great Value", color: "#34d399" },
+  "good value":  { label: "Good Value",  color: "#86efac" },
+  "ok":          { label: "Fair Value",  color: "#a3a3a3" },
+  "overpriced":  { label: "Premium",     color: "#f87171" },
+};
+
+// ─── Main App ─────────────────────────────────────────────────────
 export default function App() {
-  const [query, setQuery]           = useState("");
-  const [results, setResults]       = useState([]);
-  const [llmText, setLlmText]       = useState("");
-  const [phase, setPhase]           = useState("idle");
-  const [error, setError]           = useState("");
-  const [stats, setStats]           = useState(null);
-  const [retrievalMode, setRetrievalMode] = useState("");
-  const [queryTokens, setQueryTokens]     = useState([]);
+  const [query, setQuery]         = useState("");
+  const [results, setResults]     = useState([]);
+  const [llmText, setLlmText]     = useState("");
+  const [phase, setPhase]         = useState("idle");
+  const [error, setError]         = useState("");
+  const [stats, setStats]         = useState(null);
+  const [debugMode, setDebugMode] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Filters
-  const [showFilters,   setShowFilters]   = useState(false);
-  const [sourceFilter,  setSourceFilter]  = useState("all");
-  const [catFilter,     setCatFilter]     = useState("all");
-  const [yearMin,       setYearMin]       = useState(2021);
-  const [yearMax,       setYearMax]       = useState(2026);
-  const [alpha,         setAlpha]         = useState(0.005);
-  const [useHybrid,     setUseHybrid]     = useState(true);
+  const [sourceFilter, setSourceFilter] = useState("all");
+  const [catFilter,    setCatFilter]    = useState("all");
+  const [yearMin,      setYearMin]      = useState(2021);
+  const [yearMax,      setYearMax]      = useState(2026);
+  const [alpha,        setAlpha]        = useState(0.005);
 
-  // Load stats on mount
   useEffect(() => {
-    fetch(`${API}/stats`)
-      .then(r => r.json())
-      .then(setStats)
-      .catch(() => {});
+    fetch(`${API}/stats`).then(r => r.json()).then(setStats).catch(() => {});
   }, []);
 
   const handleSearch = async (q = query) => {
@@ -75,11 +76,11 @@ export default function App() {
           query: q,
           source_filter:   sourceFilter,
           category_filter: catFilter,
-          year_min:        yearMin,
-          year_max:        yearMax,
+          year_min: yearMin,
+          year_max: yearMax,
           alpha,
           top_k: 12,
-          use_hybrid: useHybrid,
+          use_hybrid: false,
         }),
       });
 
@@ -91,319 +92,565 @@ export default function App() {
       const data = await res.json();
       setResults(data.results);
       setLlmText(data.llm_recommendation);
-      setRetrievalMode(data.retrieval_mode);
-      setQueryTokens(data.query_tokens);
     } catch (e) {
       setError(e.message);
     }
-
     setPhase("idle");
   };
 
-  const gold   = "#d4a96a";
-  const pink   = "#f472b6";
-  const border = "rgba(255,255,255,0.07)";
-  const surf   = "rgba(255,255,255,0.025)";
-
   return (
-    <div style={{ background: "#0a0a0f", minHeight: "100vh", color: "#e5e7eb", fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
+    <div style={{
+      background: "#f7f4ef",
+      minHeight: "100vh",
+      fontFamily: "'EB Garamond', 'Garamond', Georgia, serif",
+      color: "#1a1a1a",
+    }}>
 
-      {/* ── Header ── */}
-      <div style={{ borderBottom: `1px solid ${border}`, padding: "26px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-        <div>
-          <div style={{ fontSize: "22px", letterSpacing: "4px", color: gold, textTransform: "uppercase", fontWeight: 300 }}>
-            Perfume RAG
-          </div>
-          <div style={{ fontSize: "11px", color: "#4b5563", letterSpacing: "2px", fontFamily: "monospace", marginTop: "4px" }}>
-            BM25 + ChromaDB · Hybrid RRF · Claude Haiku
+      {/* Google Fonts */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        input::placeholder { color: #9ca3af; }
+        input:focus { outline: none; }
+
+        .result-card {
+          border-bottom: 1px solid #e5e0d8;
+          padding: 24px 0;
+          transition: background 0.15s;
+          cursor: default;
+        }
+        .result-card:hover { background: rgba(0,0,0,0.015); }
+        .result-card:first-child { border-top: 1px solid #e5e0d8; }
+
+        .chip {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px 10px;
+          border-radius: 2px;
+          font-size: 10px;
+          font-family: 'DM Sans', sans-serif;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
+          font-weight: 500;
+        }
+
+        .sample-btn {
+          background: none;
+          border: 1px solid #d4cfc7;
+          border-radius: 2px;
+          padding: 6px 14px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px;
+          color: #6b6560;
+          cursor: pointer;
+          letter-spacing: 0.3px;
+          transition: all 0.15s;
+        }
+        .sample-btn:hover {
+          border-color: #1a1a1a;
+          color: #1a1a1a;
+          background: rgba(0,0,0,0.03);
+        }
+
+        .filter-btn {
+          background: none;
+          border: 1px solid #d4cfc7;
+          border-radius: 2px;
+          padding: 5px 12px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 10px;
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.15s;
+          color: #6b6560;
+        }
+        .filter-btn.active {
+          background: #1a1a1a;
+          border-color: #1a1a1a;
+          color: #f7f4ef;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.4s ease forwards; }
+
+        input[type=range] { accent-color: #1a1a1a; }
+      `}</style>
+
+      {/* ── Masthead ── */}
+      <header style={{
+        borderBottom: "2px solid #1a1a1a",
+        padding: "0 48px",
+      }}>
+        {/* Top bar */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "14px 0",
+          borderBottom: "1px solid #e5e0d8",
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: "11px",
+          letterSpacing: "1.5px",
+          textTransform: "uppercase",
+          color: "#9ca3af",
+        }}>
+          <span>Fragrance Intelligence</span>
+          <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
+            {stats && (
+              <>
+                <span>{stats.classic.toLocaleString()} Classic</span>
+                <span style={{ color: "#d4cfc7" }}>·</span>
+                <span>{stats.modern} Modern</span>
+                <span style={{ color: "#d4cfc7" }}>·</span>
+                <span>{stats.total.toLocaleString()} Total</span>
+              </>
+            )}
+            <button
+              onClick={() => setDebugMode(v => !v)}
+              style={{
+                background: debugMode ? "#1a1a1a" : "none",
+                border: "1px solid #d4cfc7",
+                borderRadius: "2px",
+                padding: "3px 10px",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "10px",
+                letterSpacing: "1px",
+                textTransform: "uppercase",
+                cursor: "pointer",
+                color: debugMode ? "#f7f4ef" : "#9ca3af",
+                transition: "all 0.15s",
+              }}
+            >
+              {debugMode ? "Debug On" : "Debug"}
+            </button>
           </div>
         </div>
-        {stats && (
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            <Pill color="#9ca3af">Classic <b>{stats.classic.toLocaleString()}</b></Pill>
-            <Pill color={pink}>Modern 2021–26 <b>{stats.modern}</b></Pill>
-            <Pill color="#60a5fa">Total <b>{stats.total.toLocaleString()}</b></Pill>
-          </div>
-        )}
-      </div>
 
-      <div style={{ maxWidth: "880px", margin: "0 auto", padding: "32px 24px" }}>
-
-        {/* ── Search bar ── */}
-        <div style={{ position: "relative", marginBottom: "14px" }}>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSearch()}
-            placeholder="Describe your occasion — romantic winter dinner, fresh summer day…"
-            style={{
-              width: "100%", background: surf,
-              border: `1px solid rgba(212,169,106,0.3)`,
-              borderRadius: "10px", padding: "15px 110px 15px 20px",
-              color: "#f0e8dc", fontSize: "15px", outline: "none",
-              fontFamily: "inherit",
-            }}
-          />
-          <button onClick={() => handleSearch()} disabled={phase !== "idle"} style={{
-            position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)",
-            background: phase !== "idle" ? "rgba(212,169,106,0.2)" : "rgba(212,169,106,0.12)",
-            border: `1px solid rgba(212,169,106,0.4)`, borderRadius: "6px",
-            color: gold, padding: "8px 18px", cursor: phase !== "idle" ? "wait" : "pointer",
-            fontSize: "12px", letterSpacing: "2px", fontFamily: "monospace",
+        {/* Logo */}
+        <div style={{
+          textAlign: "center",
+          padding: "32px 0 24px",
+        }}>
+          <div style={{
+            fontSize: "clamp(52px, 8vw, 96px)",
+            fontFamily: "'EB Garamond', Georgia, serif",
+            fontWeight: 500,
+            letterSpacing: "12px",
+            lineHeight: 1,
+            textTransform: "uppercase",
           }}>
-            {phase === "searching" ? "…" : "SEARCH"}
-          </button>
+            FRAGAI
+          </div>
+          <div style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: "11px",
+            letterSpacing: "3px",
+            textTransform: "uppercase",
+            color: "#9ca3af",
+            marginTop: "8px",
+          }}>
+            AI-Powered Fragrance Discovery
+          </div>
         </div>
+      </header>
 
-        {/* ── Sample queries ── */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "18px" }}>
-          {SAMPLE_QUERIES.map(q => (
-            <button key={q} onClick={() => handleSearch(q)} style={{
-              background: surf, border: `1px solid ${border}`, borderRadius: "20px",
-              padding: "5px 12px", color: "#9ca3af", fontSize: "11px", cursor: "pointer",
-              fontFamily: "monospace",
-            }}
-            onMouseEnter={e => { e.target.style.color = gold; e.target.style.borderColor = "rgba(212,169,106,0.4)"; }}
-            onMouseLeave={e => { e.target.style.color = "#9ca3af"; e.target.style.borderColor = border; }}
-            >{q}</button>
-          ))}
+      <main style={{ maxWidth: "900px", margin: "0 auto", padding: "48px 24px" }}>
+
+        {/* ── Search ── */}
+        <div style={{ marginBottom: "32px" }}>
+          <div style={{
+            display: "flex",
+            borderBottom: "2px solid #1a1a1a",
+            alignItems: "center",
+            gap: "16px",
+            paddingBottom: "4px",
+          }}>
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleSearch()}
+              placeholder="Describe your occasion, mood, or preference…"
+              style={{
+                flex: 1,
+                background: "none",
+                border: "none",
+                fontSize: "clamp(16px, 2.5vw, 22px)",
+                fontFamily: "'EB Garamond', serif",
+                fontStyle: "italic",
+                color: "#1a1a1a",
+                padding: "8px 0",
+              }}
+            />
+            <button
+              onClick={() => handleSearch()}
+              disabled={phase !== "idle"}
+              style={{
+                background: phase !== "idle" ? "#9ca3af" : "#1a1a1a",
+                color: "#f7f4ef",
+                border: "none",
+                padding: "10px 28px",
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "11px",
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+                cursor: phase !== "idle" ? "wait" : "pointer",
+                transition: "background 0.15s",
+                flexShrink: 0,
+              }}
+            >
+              {phase === "searching" ? "Searching…" : "Discover"}
+            </button>
+          </div>
+
+          {/* Sample queries */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "16px" }}>
+            {SAMPLE_QUERIES.map(q => (
+              <button key={q} className="sample-btn" onClick={() => handleSearch(q)}>{q}</button>
+            ))}
+          </div>
         </div>
 
         {/* ── Filters ── */}
-        <div style={{ marginBottom: "22px" }}>
-          <button onClick={() => setShowFilters(v => !v)} style={{
-            background: "none", border: `1px solid ${border}`, borderRadius: "6px",
-            color: "#6b7280", padding: "6px 14px", cursor: "pointer",
-            fontSize: "11px", letterSpacing: "2px", fontFamily: "monospace",
-          }}>
-            {showFilters ? "▲ HIDE FILTERS" : "▼ FILTERS & SETTINGS"}
+        <div style={{ marginBottom: "40px" }}>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "11px", letterSpacing: "1.5px",
+              textTransform: "uppercase", color: "#9ca3af",
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: 0,
+            }}
+          >
+            <span style={{ fontSize: "8px" }}>{showFilters ? "▲" : "▼"}</span>
+            Filters & Settings
           </button>
 
           {showFilters && (
-            <div style={{
-              marginTop: "12px", background: surf, border: `1px solid ${border}`,
-              borderRadius: "10px", padding: "20px 24px",
-              display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "20px",
+            <div className="fade-in" style={{
+              marginTop: "20px",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "24px",
+              padding: "24px",
+              background: "#efebe4",
+              borderRadius: "2px",
             }}>
               {/* Dataset */}
               <div>
-                <Label>Dataset</Label>
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
-                  {[["all","All (1800)"], ["classic","Classic (1200)"], ["modern","Modern 2021–26 (600)"]].map(([v, label]) => (
-                    <FilterBtn key={v} active={sourceFilter === v} color={v === "modern" ? pink : "#9ca3af"} onClick={() => setSourceFilter(v)}>{label}</FilterBtn>
+                <FilterLabel>Dataset</FilterLabel>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
+                  {[["all","All"], ["classic","Classic"], ["modern","Modern"]].map(([v, l]) => (
+                    <button key={v} className={`filter-btn ${sourceFilter === v ? "active" : ""}`}
+                      onClick={() => setSourceFilter(v)}>{l}</button>
                   ))}
                 </div>
               </div>
 
               {/* Category */}
               <div>
-                <Label>Category</Label>
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
+                <FilterLabel>Category</FilterLabel>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
                   {["all","designer","niche","budget","middle eastern"].map(c => (
-                    <FilterBtn key={c} active={catFilter === c} color={CAT_COLORS[c] || gold} onClick={() => setCatFilter(c)}>
-                      {c === "all" ? "All" : c}
-                    </FilterBtn>
+                    <button key={c} className={`filter-btn ${catFilter === c ? "active" : ""}`}
+                      onClick={() => setCatFilter(c)}>{c === "all" ? "All" : c}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Year range */}
+              {/* Year */}
               {sourceFilter !== "classic" && (
                 <div>
-                  <Label>Year Range — {yearMin}–{yearMax}</Label>
-                  <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                  <FilterLabel>Year Range — {yearMin}–{yearMax}</FilterLabel>
+                  <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
                     <input type="range" min="2021" max="2026" value={yearMin}
                       onChange={e => setYearMin(Math.min(+e.target.value, yearMax))}
-                      style={{ flex: 1, accentColor: pink }} />
+                      style={{ flex: 1 }} />
                     <input type="range" min="2021" max="2026" value={yearMax}
                       onChange={e => setYearMax(Math.max(+e.target.value, yearMin))}
-                      style={{ flex: 1, accentColor: pink }} />
+                      style={{ flex: 1 }} />
                   </div>
                 </div>
               )}
 
               {/* Alpha */}
               <div>
-                <Label>Value Signal α = {alpha.toFixed(4)}</Label>
+                <FilterLabel>Value Signal α = {alpha.toFixed(3)}</FilterLabel>
                 <input type="range" min="0" max="0.02" step="0.001" value={alpha}
                   onChange={e => setAlpha(+e.target.value)}
-                  style={{ width: "100%", marginTop: "10px", accentColor: gold }} />
-                <div style={{ fontSize: "10px", color: "#4b5563", fontFamily: "monospace", marginTop: "4px" }}>
-                  0 = pure BM25 · 0.02 = max value boost
-                </div>
-              </div>
-
-              {/* Hybrid toggle */}
-              <div>
-                <Label>Retrieval Mode</Label>
-                <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
-                  <FilterBtn active={useHybrid} color="#a78bfa" onClick={() => setUseHybrid(true)}>Hybrid RRF</FilterBtn>
-                  <FilterBtn active={!useHybrid} color={gold} onClick={() => setUseHybrid(false)}>BM25 only</FilterBtn>
+                  style={{ width: "100%", marginTop: "12px" }} />
+                <div style={{ fontSize: "10px", color: "#9ca3af", fontFamily: "'DM Sans', sans-serif", marginTop: "4px" }}>
+                  0 = pure relevance · 0.02 = max value boost
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* ── Status / Error ── */}
-        {phase === "searching" && <StatusBar color={gold}>⟳ Retrieving and generating…</StatusBar>}
-        {error && <StatusBar color="#f87171">✗ {error}</StatusBar>}
-
-        {/* ── Retrieval metadata ── */}
-        {results.length > 0 && retrievalMode && (
-          <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
-            <Tag color={retrievalMode.includes("hybrid") ? "#a78bfa" : gold}>
-              {retrievalMode === "hybrid_rrf" ? "Hybrid RRF" : "BM25"}
-            </Tag>
-            {queryTokens.map(t => <Tag key={t} color="#4b5563">{t}</Tag>)}
+        {/* ── Error ── */}
+        {error && (
+          <div style={{
+            padding: "16px 20px", background: "#fef2f2", border: "1px solid #fecaca",
+            borderRadius: "2px", marginBottom: "32px",
+            fontFamily: "'DM Sans', sans-serif", fontSize: "13px", color: "#dc2626",
+          }}>
+            {error}
           </div>
         )}
 
         {/* ── LLM Recommendation ── */}
         {llmText && (
-          <div style={{
-            background: "rgba(212,169,106,0.06)", border: `1px solid rgba(212,169,106,0.2)`,
-            borderRadius: "12px", padding: "24px 28px", marginBottom: "28px",
-          }}>
-            <SectionLabel color={gold}>Claude's Recommendation</SectionLabel>
-            <div style={{ lineHeight: "1.9", fontSize: "15px", whiteSpace: "pre-wrap", marginTop: "12px" }}>
-              {llmText}
+          <div className="fade-in" style={{ marginBottom: "48px" }}>
+            {/* Editorial pull quote style */}
+            <div style={{
+              borderTop: "2px solid #1a1a1a",
+              borderBottom: "1px solid #e5e0d8",
+              padding: "32px 0",
+              position: "relative",
+            }}>
+              <div style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "10px",
+                letterSpacing: "3px",
+                textTransform: "uppercase",
+                color: "#9ca3af",
+                marginBottom: "20px",
+              }}>
+                Our Recommendation
+              </div>
+              <div style={{
+                fontSize: "clamp(15px, 1.8vw, 17px)",
+                lineHeight: "1.85",
+                fontFamily: "'EB Garamond', serif",
+                color: "#1a1a1a",
+                whiteSpace: "pre-wrap",
+              }}>
+                {llmText}
+              </div>
             </div>
           </div>
         )}
 
         {/* ── Results ── */}
         {results.length > 0 && (
-          <div>
-            <SectionLabel color="#6b7280">Retrieved candidates — {results.length}</SectionLabel>
-            <div style={{ display: "grid", gap: "8px", marginTop: "10px" }}>
-              {results.map((p, i) => <ResultCard key={i} p={p} rank={i + 1} />)}
+          <div className="fade-in">
+            <div style={{
+              display: "flex", alignItems: "baseline",
+              justifyContent: "space-between",
+              marginBottom: "4px",
+            }}>
+              <div style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "10px", letterSpacing: "3px",
+                textTransform: "uppercase", color: "#9ca3af",
+              }}>
+                Retrieved Fragrances
+              </div>
+              <div style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "10px", color: "#9ca3af",
+              }}>
+                {results.length} matches
+              </div>
+            </div>
+
+            <div>
+              {results.map((p, i) => (
+                <ResultCard key={i} p={p} rank={i + 1} debugMode={debugMode} />
+              ))}
             </div>
           </div>
         )}
 
         {/* ── Empty state ── */}
         {phase === "idle" && results.length === 0 && !error && (
-          <div style={{ textAlign: "center", padding: "80px 0", color: "#374151" }}>
-            <div style={{ fontSize: "52px", marginBottom: "16px", opacity: 0.3 }}>◈</div>
-            <div style={{ fontFamily: "monospace", fontSize: "12px", letterSpacing: "3px" }}>
-              DESCRIBE YOUR OCCASION ABOVE
+          <div style={{ textAlign: "center", padding: "80px 0" }}>
+            <div style={{
+              fontSize: "72px",
+              fontFamily: "'EB Garamond', serif",
+              fontStyle: "italic",
+              color: "#d4cfc7",
+              lineHeight: 1,
+              marginBottom: "16px",
+            }}>
+              ◈
+            </div>
+            <div style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "11px",
+              letterSpacing: "3px",
+              textTransform: "uppercase",
+              color: "#c4bfb7",
+            }}>
+              Describe your moment
             </div>
             {stats && (
-              <div style={{ fontFamily: "monospace", fontSize: "10px", marginTop: "8px", color: "#1f2937" }}>
-                {stats.total.toLocaleString()} fragrances indexed across {stats.classic} classic + {stats.modern} modern
+              <div style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "11px",
+                color: "#d4cfc7",
+                marginTop: "8px",
+              }}>
+                {stats.total.toLocaleString()} fragrances indexed
               </div>
             )}
           </div>
         )}
-      </div>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer style={{
+        borderTop: "1px solid #e5e0d8",
+        padding: "24px 48px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        fontFamily: "'DM Sans', sans-serif",
+        fontSize: "10px",
+        letterSpacing: "1px",
+        color: "#c4bfb7",
+        textTransform: "uppercase",
+      }}>
+        <span>FRAGAI © 2026</span>
+        <span>BM25 · Claude Haiku · 1,800 Fragrances</span>
+      </footer>
     </div>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────
-function ResultCard({ p, rank }) {
-  const bdr = "rgba(255,255,255,0.07)";
-  return (
-    <div style={{
-      background: "rgba(255,255,255,0.022)", border: `1px solid ${bdr}`,
-      borderRadius: "10px", padding: "14px 18px",
-      display: "flex", alignItems: "center", gap: "14px",
-    }}
-    onMouseEnter={e => e.currentTarget.style.borderColor = "rgba(212,169,106,0.3)"}
-    onMouseLeave={e => e.currentTarget.style.borderColor = bdr}
-    >
-      <div style={{
-        width: "26px", height: "26px", borderRadius: "50%",
-        background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: "11px", fontFamily: "monospace", color: "#6b7280", flexShrink: 0,
-      }}>{rank}</div>
+// ─── Result Card ──────────────────────────────────────────────────
+function ResultCard({ p, rank, debugMode }) {
+  const cat    = CAT_COLORS[p.category] || { bg: "#1a1a1a", text: "#e5e0d8" };
+  const gender = genderLabel(p.feminine_index, p.masculine_index);
+  const value  = VALUE_LABELS[p.value_for_money] || VALUE_LABELS["ok"];
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "15px", color: "#f0e8dc" }}>{p.name}</span>
-          <span style={{ fontSize: "12px", color: "#9ca3af" }}>{p.brand}</span>
+  const climateStr = p.climate.includes("all")
+    ? "All Seasons"
+    : p.climate.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(", ");
+
+  const todStr = { night: "Evening", day: "Daytime", any: "Anytime" }[p.time_of_day] || p.time_of_day;
+  const projStr = p.projection === "strong" ? "Strong Projection" : "Moderate Projection";
+
+  return (
+    <div className="result-card" style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
+
+      {/* Rank number */}
+      <div style={{
+        fontFamily: "'EB Garamond', serif",
+        fontSize: "13px",
+        color: "#c4bfb7",
+        minWidth: "24px",
+        paddingTop: "2px",
+        fontStyle: "italic",
+      }}>
+        {String(rank).padStart(2, "0")}
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex: 1 }}>
+
+        {/* Name + Brand + Year */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: "12px", flexWrap: "wrap", marginBottom: "10px" }}>
+          <span style={{
+            fontSize: "clamp(17px, 2vw, 21px)",
+            fontFamily: "'EB Garamond', serif",
+            fontWeight: 500,
+            letterSpacing: "0.3px",
+          }}>
+            {p.name}
+          </span>
+          <span style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: "12px",
+            color: "#6b6560",
+            fontWeight: 300,
+          }}>
+            {p.brand}
+          </span>
           {p.release_year && (
-            <span style={{ fontSize: "11px", color: "#f472b6", fontFamily: "monospace" }}>{p.release_year}</span>
+            <span style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: "10px",
+              color: "#9ca3af",
+              letterSpacing: "0.5px",
+            }}>
+              {p.release_year}
+            </span>
           )}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "7px" }}>
-          <Tag color={CAT_COLORS[p.category]}>{p.category}</Tag>
-          <Tag color={SOURCE_COLORS[p._source]}>{p._source}</Tag>
-          <Tag>{p.climate.join("/")}</Tag>
-          <Tag>{p.time_of_day}</Tag>
-          <Tag>{p.projection}</Tag>
-          <Tag color={p.value_for_money === "great value" ? "#34d399" : p.value_for_money === "overpriced" ? "#f87171" : "#9ca3af"}>
-            {p.value_for_money}
-          </Tag>
-          {p.feminine_index > 0.7 && <Tag color="#f9a8d4">♀ {p.feminine_index}</Tag>}
-          {p.masculine_index > 0.7 && <Tag color="#93c5fd">♂ {p.masculine_index}</Tag>}
-        </div>
-        {p.source_url && (
-          <a href={p.source_url} target="_blank" rel="noreferrer"
-            style={{ display: "inline-block", marginTop: "5px", fontSize: "10px", color: "#4b5563", fontFamily: "monospace", textDecoration: "none" }}
-            onMouseEnter={e => e.target.style.color = "#9ca3af"}
-            onMouseLeave={e => e.target.style.color = "#4b5563"}
-          >↗ parfumo.com</a>
-        )}
-      </div>
 
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontFamily: "monospace", fontSize: "13px", color: "#d4a96a" }}>
-          {typeof p.bm25_score === "number" ? p.bm25_score.toFixed(3) : "—"}
+        {/* Tags row */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
+
+          {/* Category */}
+          <span className="chip" style={{ background: cat.bg, color: cat.text }}>
+            {p.category}
+          </span>
+
+          {/* Source */}
+          <span className="chip" style={{
+            background: p._source === "modern" ? "#1e0a1a" : "#1a1a1a",
+            color: p._source === "modern" ? "#f9a8d4" : "#a3a3a3",
+          }}>
+            {p._source}
+          </span>
+
+          {/* Climate */}
+          <span className="chip" style={{ background: "#f0ece5", color: "#6b6560" }}>
+            {climateStr}
+          </span>
+
+          {/* Time of day */}
+          <span className="chip" style={{ background: "#f0ece5", color: "#6b6560" }}>
+            {todStr}
+          </span>
+
+          {/* Projection */}
+          <span className="chip" style={{ background: "#f0ece5", color: "#6b6560" }}>
+            {projStr}
+          </span>
+
+          {/* Value */}
+          <span className="chip" style={{ background: "#f0ece5", color: value.color }}>
+            {value.label}
+          </span>
+
+          {/* Gender */}
+          <span className="chip" style={{ background: "#f0ece5", color: gender.color }}>
+            {gender.label}
+          </span>
+
+          {/* Debug: BM25 score */}
+          {debugMode && (
+            <span className="chip" style={{
+              background: "#1a1a1a", color: "#fbbf24",
+              fontFamily: "monospace",
+            }}>
+              BM25 {typeof p.bm25_score === "number" ? p.bm25_score.toFixed(3) : "—"}
+            </span>
+          )}
         </div>
-        <div style={{ fontSize: "10px", color: "#374151", fontFamily: "monospace" }}>score</div>
       </div>
     </div>
   );
 }
 
-function Tag({ children, color }) {
-  return (
-    <span style={{
-      padding: "2px 7px", borderRadius: "4px", fontSize: "10px",
-      fontFamily: "monospace", background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.07)", color: color || "#6b7280",
-    }}>{children}</span>
-  );
-}
-
-function Pill({ children, color }) {
-  return (
-    <span style={{
-      padding: "4px 12px", borderRadius: "20px", fontSize: "11px",
-      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
-      color: color || "#9ca3af", fontFamily: "monospace",
-    }}>{children}</span>
-  );
-}
-
-function Label({ children }) {
-  return <div style={{ fontSize: "10px", letterSpacing: "2px", color: "#6b7280", textTransform: "uppercase", fontFamily: "monospace" }}>{children}</div>;
-}
-
-function SectionLabel({ children, color }) {
-  return <div style={{ fontSize: "10px", letterSpacing: "3px", color: color || "#6b7280", textTransform: "uppercase", fontFamily: "monospace", marginBottom: "10px" }}>{children}</div>;
-}
-
-function FilterBtn({ children, active, color, onClick }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: "4px 10px", borderRadius: "5px", fontSize: "10px", fontFamily: "monospace",
-      cursor: "pointer", background: active ? "rgba(255,255,255,0.07)" : "none",
-      border: `1px solid ${active ? color : "rgba(255,255,255,0.1)"}`,
-      color: active ? color : "#6b7280",
-    }}>{children}</button>
-  );
-}
-
-function StatusBar({ children, color }) {
+// ─── Small helpers ────────────────────────────────────────────────
+function FilterLabel({ children }) {
   return (
     <div style={{
-      padding: "10px 16px", borderRadius: "8px", marginBottom: "16px",
-      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-      fontSize: "12px", fontFamily: "monospace", color: color || "#9ca3af",
-    }}>{children}</div>
+      fontFamily: "'DM Sans', sans-serif",
+      fontSize: "10px",
+      letterSpacing: "1.5px",
+      textTransform: "uppercase",
+      color: "#9ca3af",
+    }}>
+      {children}
+    </div>
   );
 }
