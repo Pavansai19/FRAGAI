@@ -17,6 +17,7 @@ app = FastAPI(title="FRAGAI API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*", "https://mindful-education-production-e35f.up.railway.app"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
