@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import anthropic
@@ -16,11 +17,22 @@ app = FastAPI(title="FRAGAI API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*", "https://mindful-education-production-e35f.up.railway.app"],
+    allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+@app.options("/{rest_of_path:path}")
+async def preflight_handler(rest_of_path: str):
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 # ─── Load Data ────────────────────────────────────────────────────
 def load_datasets():
